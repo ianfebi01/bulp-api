@@ -1,0 +1,57 @@
+{
+  "info": {
+    "name": "Bulb API",
+    "description": "On/off bulb control API for ESP32",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Get bulb state",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/bulb",
+        "description": "Returns whether the bulb is on/off and when it was last updated."
+      }
+    },
+    {
+      "name": "Turn bulb on",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/bulb/on",
+        "description": "Turns the bulb on."
+      }
+    },
+    {
+      "name": "Turn bulb off",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/bulb/off",
+        "description": "Turns the bulb off."
+      }
+    },
+    {
+      "name": "Set bulb state",
+      "request": {
+        "method": "PUT",
+        "url": "{{baseUrl}}/bulb",
+        "description": "Set the bulb on or off via JSON body.",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"is_on\": true}"
+        }
+      }
+    }
+  ]
+}
