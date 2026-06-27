@@ -116,8 +116,7 @@ plus an optional push-button to toggle locally and `PUT` the new state back to t
    ```
    Then **Tools → Board → Boards Manager**, search `esp8266`, install.
 
-2. **Install libraries** — **Sketch → Include Library → Manage Libraries**, install both:
-   - `ArduinoJson` by Benoit Blanchon
+2. **No extra libraries needed** — the sketch only uses built-in `ESP8266WiFi` and `ESP8266HTTPClient`.
 
 3. **Open the sketch** — `esp8266/bulb-client.ino`
 
@@ -175,8 +174,6 @@ The server is the source of truth. The ESP always follows whatever `GET /bulb` r
 platform = espressif8266
 board = nodemcuv2
 framework = arduino
-lib_deps =
-    bblanchon/ArduinoJson@^6
 ```
 
 ## Project Structure

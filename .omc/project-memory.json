@@ -52,9 +52,15 @@
   },
   "hotPaths": [
     {
+      "path": "esp8266/bulb-client/bulb-client.ino",
+      "accessCount": 10,
+      "lastAccessed": 1782511136277,
+      "type": "file"
+    },
+    {
       "path": "README.md",
-      "accessCount": 4,
-      "lastAccessed": 1782508995361,
+      "accessCount": 6,
+      "lastAccessed": 1782509376607,
       "type": "file"
     },
     {

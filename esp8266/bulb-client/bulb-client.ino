@@ -18,15 +18,14 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
-#include <ArduinoJson.h>
 
 // ── Config ──────────────────────────────────────────────────────────
-const char* WIFI_SSID    = "YourWiFi";
-const char* WIFI_PASS    = "YourPassword";
-const char* SERVER_URL   = "http://192.168.1.100:3000";  // your Mac's IP
+const char* WIFI_SSID    = "ianfebi01";
+const char* WIFI_PASS    = "huihuihui";
+const char* SERVER_URL   = "http://192.168.1.8:3000";  // your Mac's IP
 
 const int   RELAY_PIN    = 5;   // D1 (GPIO5)
-const int   BTN_PIN      = 4;   // D2 (GPIO4) — optional toggle button
+// const int   BTN_PIN      = 4;   // D2 (GPIO4) — uncomment if button wired
 const unsigned long POLL_MS = 2000;  // poll server every 2 s
 // ─────────────────────────────────────────────────────────────────────
 
@@ -41,7 +40,7 @@ void setup() {
 
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);   // off at boot
-  pinMode(BTN_PIN, INPUT_PULLUP); // button: GND to activate
+  // pinMode(BTN_PIN, INPUT_PULLUP); // uncomment if button wired
 
   // Connect WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -55,16 +54,19 @@ void setup() {
 
   // Initial state from server
   fetchState();
+  Serial.print("Initial relay state: ");
+  Serial.println(currentState ? "ON" : "OFF");
+  Serial.println("Ready — waiting for state changes...\n");
 }
 
 void loop() {
   unsigned long now = millis();
 
-  // ── Button press (optional) ────────────────────────────
-  if (digitalRead(BTN_PIN) == LOW && (now - lastBtn > DEBOUNCE)) {
-    lastBtn = now;
-    toggleAndSync();
-  }
+  // ── Button press (optional) — uncomment if button wired ─
+  // if (digitalRead(BTN_PIN) == LOW && (now - lastBtn > DEBOUNCE)) {
+  //   lastBtn = now;
+  //   toggleAndSync();
+  // }
 
   // ── Poll server ────────────────────────────────────────
   if (now - lastPoll >= POLL_MS) {
@@ -84,12 +86,16 @@ void fetchState() {
 
   int code = http.GET();
   if (code > 0) {
-    StaticJsonDocument<128> doc;
-    DeserializationError err = deserializeJson(doc, http.getString());
-    if (!err) {
-      bool serverState = doc["is_on"];
-      applyState(serverState);
-    }
+    String payload = http.getString();
+    bool serverState = payload.indexOf("\"is_on\":true") >= 0;
+    Serial.print("Poll: code=");
+    Serial.print(code);
+    Serial.print(" is_on=");
+    Serial.println(serverState ? "true" : "false");
+    applyState(serverState);
+  } else {
+    Serial.print("Poll failed: code=");
+    Serial.println(code);
   }
   http.end();
 }
