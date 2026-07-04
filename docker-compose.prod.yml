@@ -5,6 +5,12 @@ services:
     volumes:
       - bulb-data:/app/data
     restart: unless-stopped
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
 
 volumes:
   bulb-data:
