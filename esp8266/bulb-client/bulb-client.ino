@@ -22,9 +22,9 @@
 // ── Config ──────────────────────────────────────────────────────────
 const char* WIFI_SSID    = "ianfebi01";
 const char* WIFI_PASS    = "huihuihui";
-const char* SERVER_URL   = "http://192.168.1.8:3000";  // your Mac's IP
+const char* SERVER_URL   = "https://bulb-api.ianfebisastrataruna.my.id";
 
-const int   RELAY_PIN    = 5;   // D1 (GPIO5)
+const int   RELAY_PIN    = 0;   // D1 (GPIO5)
 // const int   BTN_PIN      = 4;   // D2 (GPIO4) — uncomment if button wired
 const unsigned long POLL_MS = 2000;  // poll server every 2 s
 // ─────────────────────────────────────────────────────────────────────
