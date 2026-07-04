@@ -25,14 +25,11 @@ const char* WIFI_PASS    = "huihuihui";
 const char* SERVER_URL   = "https://bulb-api.ianfebisastrataruna.my.id";
 
 const int   RELAY_PIN    = 0;   // D1 (GPIO5)
-// const int   BTN_PIN      = 4;   // D2 (GPIO4) — uncomment if button wired
 const unsigned long POLL_MS = 2000;  // poll server every 2 s
 // ─────────────────────────────────────────────────────────────────────
 
 bool currentState = false;       // true = on, false = off
 unsigned long lastPoll = 0;
-unsigned long lastBtn = 0;
-const unsigned long DEBOUNCE = 300;
 
 void setup() {
   Serial.begin(115200);
@@ -40,7 +37,6 @@ void setup() {
 
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);   // off at boot
-  // pinMode(BTN_PIN, INPUT_PULLUP); // uncomment if button wired
 
   // Connect WiFi
   WiFi.begin(WIFI_SSID, WIFI_PASS);
@@ -62,12 +58,6 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // ── Button press (optional) — uncomment if button wired ─
-  // if (digitalRead(BTN_PIN) == LOW && (now - lastBtn > DEBOUNCE)) {
-  //   lastBtn = now;
-  //   toggleAndSync();
-  // }
-
   // ── Poll server ────────────────────────────────────────
   if (now - lastPoll >= POLL_MS) {
     lastPoll = now;
@@ -77,42 +67,40 @@ void loop() {
 
 // ── Fetch bulb state from GET /bulb ─────────────────────
 void fetchState() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Poll skipped: WiFi not connected");
+    return;
+  }
 
-  WiFiClient client;
+  WiFiClientSecure client;
+  client.setInsecure();  // skip TLS cert validation (ESP8266 lacks root CAs)
+
   HTTPClient http;
   http.useHTTP10(true);
   http.begin(client, String(SERVER_URL) + "/bulb");
 
+  Serial.print("[HTTP] GET ");
+  Serial.print(SERVER_URL);
+  Serial.println("/bulb");
+
   int code = http.GET();
+  Serial.print("[HTTP] Response code: ");
+  Serial.println(code);
+
   if (code > 0) {
     String payload = http.getString();
     bool serverState = payload.indexOf("\"is_on\":true") >= 0;
-    Serial.print("Poll: code=");
-    Serial.print(code);
-    Serial.print(" is_on=");
+
+    Serial.print("[HTTP] Body: ");
+    Serial.println(payload);
+    Serial.print("[HTTP] Parsed is_on: ");
     Serial.println(serverState ? "true" : "false");
+
     applyState(serverState);
   } else {
-    Serial.print("Poll failed: code=");
-    Serial.println(code);
+    Serial.print("[HTTP] Error: ");
+    Serial.println(http.errorToString(code).c_str());
   }
-  http.end();
-}
-
-// ── Toggle local + sync to server ───────────────────────
-void toggleAndSync() {
-  bool newState = !currentState;
-  applyState(newState);
-
-  WiFiClient client;
-  HTTPClient http;
-  http.useHTTP10(true);
-  http.begin(client, String(SERVER_URL) + "/bulb");
-  http.addHeader("Content-Type", "application/json");
-
-  String body = newState ? "{\"is_on\":true}" : "{\"is_on\":false}";
-  http.PUT(body);
   http.end();
 }
 
