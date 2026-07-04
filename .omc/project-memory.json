@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1782508159514,
+  "lastScanned": 1783133055366,
   "projectRoot": "/Users/ianfebi01/Work/Web/bulb-api",
   "techStack": {
     "languages": [
@@ -13,7 +13,13 @@
         ]
       }
     ],
-    "frameworks": [],
+    "frameworks": [
+      {
+        "name": "axum",
+        "version": null,
+        "category": "backend"
+      }
+    ],
     "packageManager": "cargo",
     "runtime": null
   },
@@ -40,69 +46,76 @@
   },
   "customNotes": [],
   "directoryMap": {
+    "esp8266": {
+      "path": "esp8266",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1783133055346,
+      "keyFiles": []
+    },
     "src": {
       "path": "src",
       "purpose": "Source code",
-      "fileCount": 1,
-      "lastAccessed": 1782508159488,
+      "fileCount": 4,
+      "lastAccessed": 1783133055346,
       "keyFiles": [
-        "main.rs"
+        "db.rs",
+        "handlers.rs",
+        "main.rs",
+        "models.rs"
+      ]
+    },
+    "target": {
+      "path": "target",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1783133055347,
+      "keyFiles": [
+        "CACHEDIR.TAG"
       ]
     }
   },
   "hotPaths": [
     {
-      "path": "esp8266/bulb-client/bulb-client.ino",
-      "accessCount": 10,
-      "lastAccessed": 1782511136277,
-      "type": "file"
-    },
-    {
-      "path": "README.md",
-      "accessCount": 6,
-      "lastAccessed": 1782509376607,
+      "path": "Dockerfile",
+      "accessCount": 3,
+      "lastAccessed": 1783134755318,
       "type": "file"
     },
     {
       "path": "src/main.rs",
       "accessCount": 3,
-      "lastAccessed": 1782508336294,
+      "lastAccessed": 1783136216985,
       "type": "file"
     },
     {
       "path": "Cargo.toml",
-      "accessCount": 2,
-      "lastAccessed": 1782508201413,
+      "accessCount": 1,
+      "lastAccessed": 1783133071724,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1783133075152,
+      "type": "file"
+    },
+    {
+      "path": ".dockerignore",
+      "accessCount": 1,
+      "lastAccessed": 1783133106984,
+      "type": "file"
+    },
+    {
+      "path": "docker-compose.yml",
+      "accessCount": 1,
+      "lastAccessed": 1783133107113,
       "type": "file"
     },
     {
       "path": "src/db.rs",
       "accessCount": 1,
-      "lastAccessed": 1782508209028,
-      "type": "file"
-    },
-    {
-      "path": "src/models.rs",
-      "accessCount": 1,
-      "lastAccessed": 1782508209940,
-      "type": "file"
-    },
-    {
-      "path": "src/handlers.rs",
-      "accessCount": 1,
-      "lastAccessed": 1782508212883,
-      "type": "file"
-    },
-    {
-      "path": "bulb-api.postman_collection.json",
-      "accessCount": 1,
-      "lastAccessed": 1782508629035,
-      "type": "file"
-    },
-    {
-      "path": "esp8266/bulb-client.ino",
-      "accessCount": 1,
-      "lastAccessed": 1782508975888,
+      "lastAccessed": 1783133111620,
       "type": "file"
     }
   ],

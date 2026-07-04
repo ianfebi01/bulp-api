@@ -1,0 +1,12 @@
+services:
+  bulb-api:
+    build: .
+    container_name: bulb-api
+    ports:
+      - "3000:3000"
+    volumes:
+      - bulb-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  bulb-data:

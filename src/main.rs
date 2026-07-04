@@ -11,8 +11,9 @@ use crate::handlers::{bulb_off, bulb_on, get_bulb, set_bulb, AppState};
 
 #[tokio::main]
 async fn main() {
-    // Open (or create) the SQLite database
-    let db = Db::open("bulb.db").expect("Failed to open database");
+    // Open (or create) the SQLite database — path from env or default
+    let db_path = std::env::var("BULB_DB_PATH").unwrap_or_else(|_| "bulb.db".into());
+    let db = Db::open(&db_path).expect("Failed to open database");
     let state: AppState = Arc::new(db);
 
     // CORS — allow all origins for ESP32 access

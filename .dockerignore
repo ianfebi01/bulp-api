@@ -1,0 +1,27 @@
+# Rust build artifacts
+/target
+
+# Git
+.git
+.gitignore
+
+# IDE / editor
+.claude
+.omc
+.vscode
+.idea
+
+# Database (use a volume)
+bulb.db
+
+# Docs & misc
+README.md
+*.postman_collection.json
+
+# ESP8266 firmware (not needed for the server)
+esp8266/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
