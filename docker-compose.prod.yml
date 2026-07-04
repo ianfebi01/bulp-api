@@ -1,0 +1,10 @@
+services:
+  bulb-api:
+    image: ghcr.io/ianfebi01/bulb-api:latest
+    container_name: bulb-api
+    volumes:
+      - bulb-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  bulb-data:
