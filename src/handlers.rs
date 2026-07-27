@@ -1,7 +1,7 @@
 use axum::{extract::State, Json};
 
 use crate::error::AppError;
-use crate::models::{ApiResponse, BulbState, BulbStateV1};
+use crate::models::{ApiResponse, BulbState, BulbStateV1, SetBulbRequest};
 
 use deadpool_postgres::Pool;
 
@@ -89,17 +89,26 @@ pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbS
     Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }
 
-// /// PUT /bulb — set bulb state via JSON body { "is_on": true/false }.
-// pub async fn set_bulb(
-//     State(state): State<AppState>,
-//     Json(body): Json<SetBulbRequest>,
-// ) -> Result<Json<BulbState>, StatusCode> {
-//     state
-//         .db
-//         .set_state(body.is_on)
-//         .map(|(is_on, updated_at)| Json(BulbState { is_on, updated_at }))
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-// }
+/// PUT /bulb — set bulb state via JSON body { "is_on": true/false }.
+
+pub async fn set_bulb(
+    State(pool): State<Pool>,
+    Json(body): Json<SetBulbRequest>,
+) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+
+    let client = pool.get().await?;
+
+    let is_on = body.is_on;
+
+    let row = client
+    .query_opt("UPDATE bulb_state SET is_on = $2, updated_at = NOW() \
+                            WHERE id = $1 \
+                            RETURNING is_on, updated_at", &[&1_i32, &is_on])
+    .await?
+    .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
+
+    Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
+}
 
 // // ── Schedule handlers ───────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 use bulb_api::{db, handlers};
 
 use axum::{
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 
@@ -12,6 +12,7 @@ use crate::handlers::{
     get_bulb_v2,
     bulb_on,
     bulb_off,
+    set_bulb,
     not_found,
 };
 
@@ -53,7 +54,8 @@ async fn main() {
 
     let app = Router::new()
         // Bulb routes
-        .route("/bulb", get(get_bulb)) // v1 — legacy flat shape (IoT device)
+        .route("/bulb", get(get_bulb))// v1 — legacy flat shape (IoT device)
+        .route("/bulb", put(set_bulb))// v1 — legacy flat shape (IoT device)
         .route("/v2/bulb", get(get_bulb_v2)) // v2 — ApiResponse envelope
         .route("/bulb/on", post(bulb_on))
         .route("/bulb/off", post(bulb_off))
