@@ -15,7 +15,16 @@ impl<T: Serialize> ApiResponse<T> {
     }
 }
 
-/// Response for GET /bulb and PUT /bulb
+/// Legacy (v1) bulb response — flat shape consumed by the IoT device.
+/// `updated_at` is the raw Postgres text rendering (e.g. `2026-07-27 10:40:00+00`).
+/// Do NOT change this shape; existing devices depend on it.
+#[derive(Serialize)]
+pub struct BulbStateV1 {
+    pub is_on: bool,
+    pub updated_at: String,
+}
+
+/// v2 bulb response — typed timestamp, returned inside `ApiResponse`.
 #[derive(Serialize)]
 pub struct BulbState {
     pub is_on: bool,

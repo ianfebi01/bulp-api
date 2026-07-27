@@ -1,14 +1,14 @@
 use axum::{extract::State, Json};
 
 use crate::error::AppError;
-use crate::models::{ApiResponse, BulbState};
+use crate::models::{ApiResponse, BulbState, BulbStateV1};
 
 use deadpool_postgres::Pool;
 
 /// The bulb is a singleton row keyed by `id = 1` (see V1__init.sql).
 const BULB_ID: i32 = 1;
 
-/// Map a `bulb_state` row into the response model.
+/// Map a `bulb_state` row into the v2 response model.
 fn bulb_state_from_row(row: &tokio_postgres::Row) -> BulbState {
     BulbState {
         is_on: row.get("is_on"),
@@ -18,8 +18,32 @@ fn bulb_state_from_row(row: &tokio_postgres::Row) -> BulbState {
 
 // ── Bulb handlers ───────────────────────────────────────────────────
 
-/// GET /bulb — return current bulb state.
-pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+/// GET /bulb — v1, legacy flat response consumed by the IoT device.
+///
+/// Keeps the original shape `{ is_on, updated_at }` with `updated_at` as the
+/// raw Postgres text rendering. Do NOT change this — devices depend on it.
+/// New clients should use `GET /v2/bulb` (see [`get_bulb_v2`]).
+pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbStateV1>, AppError> {
+    let client = pool.get().await?;
+
+    let row = client
+        .query_opt(
+            "SELECT is_on, updated_at::TEXT FROM bulb_state WHERE id = $1",
+            &[&BULB_ID],
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
+
+    Ok(Json(BulbStateV1 {
+        is_on: row.get("is_on"),
+        updated_at: row.get("updated_at"),
+    }))
+}
+
+/// GET /v2/bulb — return current bulb state in the standard envelope.
+pub async fn get_bulb_v2(
+    State(pool): State<Pool>,
+) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
     let row = client

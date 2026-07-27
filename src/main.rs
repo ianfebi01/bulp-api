@@ -9,6 +9,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::handlers::{
     get_bulb,
+    get_bulb_v2,
     bulb_on,
     bulb_off,
     not_found,
@@ -52,7 +53,8 @@ async fn main() {
 
     let app = Router::new()
         // Bulb routes
-        .route("/bulb", get(get_bulb))
+        .route("/bulb", get(get_bulb)) // v1 — legacy flat shape (IoT device)
+        .route("/v2/bulb", get(get_bulb_v2)) // v2 — ApiResponse envelope
         .route("/bulb/on", post(bulb_on))
         .route("/bulb/off", post(bulb_off))
         // // Schedule routes
