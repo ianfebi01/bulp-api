@@ -1,10 +1,26 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+
+/// Standard success envelope for every handler:
+/// `{ "success": true, "data": ... }`.
+#[derive(Serialize)]
+pub struct ApiResponse<T: Serialize> {
+    pub success: bool,
+    pub data: T,
+}
+
+impl<T: Serialize> ApiResponse<T> {
+    pub fn new(data: T) -> Self {
+        Self { success: true, data }
+    }
+}
 
 /// Response for GET /bulb and PUT /bulb
 #[derive(Serialize)]
 pub struct BulbState {
     pub is_on: bool,
-    pub updated_at: String,
+    /// Serialized as RFC 3339 (e.g. `2026-07-27T10:40:00Z`).
+    pub updated_at: DateTime<Utc>,
 }
 
 /// Request body for PUT /bulb

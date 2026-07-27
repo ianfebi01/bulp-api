@@ -1,14 +1,16 @@
 use bulb_api::{db, handlers};
 
 use axum::{
-    routing::{get},
+    routing::{get, post},
     Router,
 };
 
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::handlers::{
-    get_bulb
+    get_bulb,
+    bulb_on,
+    not_found,
 };
 
 #[tokio::main]
@@ -50,7 +52,7 @@ async fn main() {
     let app = Router::new()
         // Bulb routes
         .route("/bulb", get(get_bulb))
-        // .route("/bulb/on", post(bulb_on))
+        .route("/bulb/on", post(bulb_on))
         // .route("/bulb/off", post(bulb_off))
         // // Schedule routes
         // .route("/schedules", get(list_schedules).post(create_schedule))
@@ -58,7 +60,8 @@ async fn main() {
         //     "/schedules/{id}",
         //     get(get_schedule).put(update_schedule).delete(delete_schedule),
         // )
-        // .layer(cors)
+        .layer(cors)
+        .fallback(not_found)
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")

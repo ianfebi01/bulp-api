@@ -1,38 +1,56 @@
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    Json,
-};
+use axum::{extract::State, Json};
 
-use crate::models::{
-    BulbState,
-};
+use crate::error::AppError;
+use crate::models::{ApiResponse, BulbState};
 
 use deadpool_postgres::Pool;
 
-fn internal_err<E: std::fmt::Display>(e: E) -> (StatusCode, String) {
-    (StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+/// The bulb is a singleton row keyed by `id = 1` (see V1__init.sql).
+const BULB_ID: i32 = 1;
+
+/// Map a `bulb_state` row into the response model.
+fn bulb_state_from_row(row: &tokio_postgres::Row) -> BulbState {
+    BulbState {
+        is_on: row.get("is_on"),
+        updated_at: row.get("updated_at"),
+    }
 }
 
 // ── Bulb handlers ───────────────────────────────────────────────────
 
 /// GET /bulb — return current bulb state.
-pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbState>, (StatusCode, String)> {
-    let client = pool.get().await.map_err(internal_err)?;
+pub async fn get_bulb(
+    State(pool): State<Pool>,
+) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+    let client = pool.get().await?;
 
     let row = client
         .query_opt(
-            "SELECT is_on, updated_at::TEXT FROM bulb_state WHERE id = $1",
-            &[&1_i32],
+            "SELECT is_on, updated_at FROM bulb_state WHERE id = $1",
+            &[&BULB_ID],
         )
-        .await
-        .map_err(internal_err)?
-        .ok_or_else(|| (StatusCode::NOT_FOUND, "Bulb state not found".into()))?;
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
 
-    let is_on: bool = row.get("is_on");
-    let updated_at: String = row.get("updated_at");
+    Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
+}
 
-    Ok(Json(BulbState { is_on, updated_at }))
+/// POST /bulb/on — turn the bulb on.
+pub async fn bulb_on(
+    State(pool): State<Pool>,
+) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+    let client = pool.get().await?;
+
+    let row = client
+        .query_opt(
+            "UPDATE bulb_state SET is_on = TRUE, updated_at = NOW() \
+             WHERE id = $1 RETURNING is_on, updated_at",
+            &[&BULB_ID],
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
+
+    Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }
 
 // /// POST /bulb/on — turn the bulb on.
@@ -172,3 +190,9 @@ pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbState>, (Stat
 //         Err(StatusCode::NOT_FOUND)
 //     }
 // }
+
+use axum::response::IntoResponse;
+
+pub async fn not_found() -> impl IntoResponse {
+    AppError::NotFound("route not found".into())
+}
