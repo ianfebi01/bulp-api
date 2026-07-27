@@ -73,6 +73,7 @@ pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbSt
     Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }
 
+/// POST /bulb/off — turn the bulb off.
 pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
@@ -87,15 +88,6 @@ pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbS
 
     Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }
-
-// /// POST /bulb/off — turn the bulb off.
-// pub async fn bulb_off(State(state): State<AppState>) -> Result<Json<BulbState>, StatusCode> {
-//     state
-//         .db
-//         .set_state(false)
-//         .map(|(is_on, updated_at)| Json(BulbState { is_on, updated_at }))
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-// }
 
 // /// PUT /bulb — set bulb state via JSON body { "is_on": true/false }.
 // pub async fn set_bulb(
