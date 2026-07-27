@@ -19,9 +19,7 @@ fn bulb_state_from_row(row: &tokio_postgres::Row) -> BulbState {
 // ── Bulb handlers ───────────────────────────────────────────────────
 
 /// GET /bulb — return current bulb state.
-pub async fn get_bulb(
-    State(pool): State<Pool>,
-) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
     let row = client
@@ -36,9 +34,7 @@ pub async fn get_bulb(
 }
 
 /// POST /bulb/on — turn the bulb on.
-pub async fn bulb_on(
-    State(pool): State<Pool>,
-) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
     let row = client
@@ -53,14 +49,20 @@ pub async fn bulb_on(
     Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }
 
-// /// POST /bulb/on — turn the bulb on.
-// pub async fn bulb_on(State(state): State<AppState>) -> Result<Json<BulbState>, StatusCode> {
-//     state
-//         .db
-//         .set_state(true)
-//         .map(|(is_on, updated_at)| Json(BulbState { is_on, updated_at }))
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-// }
+pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
+    let client = pool.get().await?;
+
+    let row = client
+        .query_opt(
+            "UPDATE bulb_state SET is_on = FALSE, updated_at = NOW() \
+    WHERE id = $1 RETURNING is_on, updated_at",
+            &[&BULB_ID],
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
+
+    Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
+}
 
 // /// POST /bulb/off — turn the bulb off.
 // pub async fn bulb_off(State(state): State<AppState>) -> Result<Json<BulbState>, StatusCode> {

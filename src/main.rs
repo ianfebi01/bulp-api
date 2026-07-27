@@ -10,6 +10,7 @@ use tower_http::cors::{Any, CorsLayer};
 use crate::handlers::{
     get_bulb,
     bulb_on,
+    bulb_off,
     not_found,
 };
 
@@ -53,7 +54,7 @@ async fn main() {
         // Bulb routes
         .route("/bulb", get(get_bulb))
         .route("/bulb/on", post(bulb_on))
-        // .route("/bulb/off", post(bulb_off))
+        .route("/bulb/off", post(bulb_off))
         // // Schedule routes
         // .route("/schedules", get(list_schedules).post(create_schedule))
         // .route(
