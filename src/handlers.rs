@@ -64,7 +64,7 @@ pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbSt
     let row = client
         .query_opt(
             "UPDATE bulb_state SET is_on = TRUE, updated_at = NOW() \
-             WHERE id = $1 RETURNING is_on, updated_at",
+                        WHERE id = $1 RETURNING is_on, updated_at",
             &[&BULB_ID],
         )
         .await?
@@ -79,7 +79,7 @@ pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbS
     let row = client
         .query_opt(
             "UPDATE bulb_state SET is_on = FALSE, updated_at = NOW() \
-    WHERE id = $1 RETURNING is_on, updated_at",
+                        WHERE id = $1 RETURNING is_on, updated_at",
             &[&BULB_ID],
         )
         .await?
