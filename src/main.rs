@@ -6,8 +6,11 @@ use axum::{
 };
 
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::handlers::{
+    ApiDoc,
     get_bulb,
     get_bulb_v2,
     bulb_on,
@@ -65,6 +68,8 @@ async fn main() {
         //     "/schedules/{id}",
         //     get(get_schedule).put(update_schedule).delete(delete_schedule),
         // )
+        // OpenAPI JSON + Swagger UI
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(cors)
         .fallback(not_found)
         .with_state(pool);
@@ -74,5 +79,6 @@ async fn main() {
         .expect("failed to bind port 3000");
 
     println!("listening on http://0.0.0.0:3000");
+    println!("swagger ui on http://0.0.0.0:3000/docs");
     axum::serve(listener, app).await.expect("server error");
 }

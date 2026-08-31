@@ -1,9 +1,24 @@
 use axum::{extract::State, Json};
+use deadpool_postgres::Pool;
+use utoipa::OpenApi;
 
 use crate::error::AppError;
 use crate::models::{ApiResponse, BulbState, BulbStateV1, SetBulbRequest};
 
-use deadpool_postgres::Pool;
+/// OpenAPI document for the whole API. Served as JSON at
+/// `/api-docs/openapi.json`, rendered by Swagger UI at `/docs`.
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Bulb API",
+        version = "0.1.0",
+        description = "IoT bulb control API"
+    ),
+    paths(get_bulb, get_bulb_v2, set_bulb, bulb_on, bulb_off),
+    components(schemas(BulbStateV1, BulbState, SetBulbRequest)),
+    tags((name = "bulb", description = "Bulb state endpoints"))
+)]
+pub struct ApiDoc;
 
 /// The bulb is a singleton row keyed by `id = 1` (see V1__init.sql).
 const BULB_ID: i32 = 1;
@@ -23,6 +38,17 @@ fn bulb_state_from_row(row: &tokio_postgres::Row) -> BulbState {
 /// Keeps the original shape `{ is_on, updated_at }` with `updated_at` as the
 /// raw Postgres text rendering. Do NOT change this — devices depend on it.
 /// New clients should use `GET /v2/bulb` (see [`get_bulb_v2`]).
+
+#[utoipa::path(
+    get,
+    path = "/bulb",
+    tag = "bulb",
+    responses(
+        (status = 200, description = "Current bulb state (legacy v1 shape)", body = BulbStateV1),
+        (status = 404, description = "Bulb state row not found"),
+        (status = 500, description = "Internal error"),
+    )
+)]
 pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbStateV1>, AppError> {
     let client = pool.get().await?;
 
@@ -41,6 +67,16 @@ pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbStateV1>, App
 }
 
 /// GET /v2/bulb — return current bulb state in the standard envelope.
+#[utoipa::path(
+    get,
+    path = "/v2/bulb",
+    tag = "bulb",
+    responses(
+        (status = 200, description = "Current bulb state", body = ApiResponse<BulbState>),
+        (status = 404, description = "Bulb state row not found"),
+        (status = 500, description = "Internal error"),
+    )
+)]
 pub async fn get_bulb_v2(
     State(pool): State<Pool>,
 ) -> Result<Json<ApiResponse<BulbState>>, AppError> {
@@ -58,6 +94,15 @@ pub async fn get_bulb_v2(
 }
 
 /// POST /bulb/on — turn the bulb on.
+#[utoipa::path(
+    post,
+    path = "/bulb/on",
+    tag = "bulb",
+    responses(
+        (status = 200, description = "Bulb turned on", body = ApiResponse<BulbState>),
+        (status = 404, description = "Bulb state row not found"),
+    )
+)]
 pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
@@ -74,6 +119,15 @@ pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbSt
 }
 
 /// POST /bulb/off — turn the bulb off.
+#[utoipa::path(
+    post,
+    path = "/bulb/off",
+    tag = "bulb",
+    responses(
+        (status = 200, description = "Bulb turned off", body = ApiResponse<BulbState>),
+        (status = 404, description = "Bulb state row not found"),
+    )
+)]
 pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     let client = pool.get().await?;
 
@@ -90,22 +144,33 @@ pub async fn bulb_off(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbS
 }
 
 /// PUT /bulb — set bulb state via JSON body { "is_on": true/false }.
-
+#[utoipa::path(
+    put,
+    path = "/bulb",
+    tag = "bulb",
+    request_body = SetBulbRequest,
+    responses(
+        (status = 200, description = "Bulb state updated", body = ApiResponse<BulbState>),
+        (status = 404, description = "Bulb state row not found"),
+    )
+)]
 pub async fn set_bulb(
     State(pool): State<Pool>,
     Json(body): Json<SetBulbRequest>,
 ) -> Result<Json<ApiResponse<BulbState>>, AppError> {
-
     let client = pool.get().await?;
 
     let is_on = body.is_on;
 
     let row = client
-    .query_opt("UPDATE bulb_state SET is_on = $2, updated_at = NOW() \
+        .query_opt(
+            "UPDATE bulb_state SET is_on = $2, updated_at = NOW() \
                             WHERE id = $1 \
-                            RETURNING is_on, updated_at", &[&1_i32, &is_on])
-    .await?
-    .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
+                            RETURNING is_on, updated_at",
+            &[&1_i32, &is_on],
+        )
+        .await?
+        .ok_or_else(|| AppError::NotFound("Bulb state not found".into()))?;
 
     Ok(Json(ApiResponse::new(bulb_state_from_row(&row))))
 }

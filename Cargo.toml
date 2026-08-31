@@ -19,3 +19,5 @@ tokio-postgres = { version = "0.7.18", features = ["with-chrono-0_4"] }
 deadpool-postgres = "0.14.1"
 dotenvy = "0.15.7"
 refinery = { version = "0.9", features = ["tokio-postgres"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono"] }
+utoipa-swagger-ui = { version = "9", features = ["axum"] }

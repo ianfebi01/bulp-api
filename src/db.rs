@@ -1,9 +1,5 @@
-use uuid::Uuid;
-
 use deadpool_postgres::{Config, Pool, Runtime};
 use tokio_postgres::NoTls;
-
-use crate::models::Schedule;
 
 pub fn create_pool() -> Pool {
     let mut cfg: Config = Config::new();
