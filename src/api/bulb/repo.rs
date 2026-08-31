@@ -1,5 +1,3 @@
-//! All SQL for the `bulb_state` table. Handlers stay free of query strings.
-
 use deadpool_postgres::Pool;
 
 use super::dto::{BulbState, BulbStateV1};

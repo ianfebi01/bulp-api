@@ -17,6 +17,7 @@ use crate::error::AppError;
 /// both the axum routes and the OpenAPI paths in one step.
 pub fn router() -> OpenApiRouter<Pool> {
     OpenApiRouter::new().merge(bulb::router())
+        .merge(schedule::router())
 }
 
 /// Fallback for unmatched routes — renders the standard error envelope.

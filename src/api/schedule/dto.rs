@@ -1,11 +1,9 @@
-//! Schedule request/response types. Kept from the pre-Postgres version;
-//! add `ToSchema` when the endpoints are wired up.
-
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 
 /// Response for schedule endpoints.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Schedule {
     pub id: String,
     pub name: String,
@@ -18,7 +16,7 @@ pub struct Schedule {
 }
 
 /// Request body for POST /schedules
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateScheduleRequest {
     pub name: String,
     pub cron_expr: String,
@@ -27,7 +25,7 @@ pub struct CreateScheduleRequest {
 }
 
 /// Request body for PUT /schedules/:id — all fields optional.
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateScheduleRequest {
     pub name: Option<String>,
     pub cron_expr: Option<String>,

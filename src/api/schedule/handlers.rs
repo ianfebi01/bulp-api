@@ -1,110 +1,135 @@
-//! Pre-Postgres schedule handlers, preserved verbatim. See module docs in
-//! `mod.rs` for how to bring these back.
+//! Schedule HTTP layer: extract, delegate to [`super::repo`], wrap the response.
 
-// // ── Schedule handlers ───────────────────────────────────────────────
+use axum::{
+    extract::{Path, State},
+    Json,
+};
+use deadpool_postgres::Pool;
 
-// /// POST /schedules — create a new schedule and register its cron job.
-// pub async fn create_schedule(
-//     State(state): State<AppState>,
-//     Json(body): Json<CreateScheduleRequest>,
-// ) -> Result<(StatusCode, Json<Schedule>), StatusCode> {
-//     // Validate action
-//     if body.action != "on" && body.action != "off" {
-//         return Err(StatusCode::BAD_REQUEST);
-//     }
+use super::dto::{CreateScheduleRequest, Schedule, UpdateScheduleRequest};
+use super::repo;
+use crate::api::response::ApiResponse;
+use crate::error::AppError;
 
-//     let schedule = state
-//         .db
-//         .create_schedule(&body.name, &body.cron_expr, &body.action)
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+/// Validate the `action` field — must be "on" or "off".
+fn check_action(action: &str) -> Result<(), AppError> {
+    if action == "on" || action == "off" {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest("action must be \"on\" or \"off\"".into()))
+    }
+}
 
-//     // Register the cron job
-//     state
-//         .scheduler
-//         .add_job(&schedule)
-//         .await
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+// ── Schedule handlers ───────────────────────────────────────────────
 
-//     Ok((StatusCode::CREATED, Json(schedule)))
-// }
+/// POST /v1/schedules — create a new schedule.
+#[utoipa::path(
+    post,
+    path = "/v1/schedules",
+    tag = "schedules",
+    request_body = CreateScheduleRequest,
+    responses(
+        (status = 200, description = "Schedule created", body = ApiResponse<Schedule>),
+        (status = 400, description = "Invalid request body"),
+    )
+)]
+pub async fn create_schedule(
+    State(pool): State<Pool>,
+    Json(body): Json<CreateScheduleRequest>,
+) -> Result<Json<ApiResponse<Schedule>>, AppError> {
+    check_action(&body.action)?;
+    let schedule =
+        repo::create_schedule(&pool, body.name, body.cron_expr, body.action).await?;
+    Ok(Json(ApiResponse::new(schedule)))
+}
 
-// /// GET /schedules — list all schedules.
-// pub async fn list_schedules(
-//     State(state): State<AppState>,
-// ) -> Result<Json<Vec<Schedule>>, StatusCode> {
-//     state
-//         .db
-//         .list_schedules()
-//         .map(Json)
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
-// }
+/// GET /v1/schedules — list all schedules.
+#[utoipa::path(
+    get,
+    path = "/v1/schedules",
+    tag = "schedules",
+    responses(
+        (status = 200, description = "List of schedules", body = ApiResponse<Vec<Schedule>>),
+        (status = 500, description = "Internal error"),
+    )
+)]
+pub async fn list_schedules(
+    State(pool): State<Pool>,
+) -> Result<Json<ApiResponse<Vec<Schedule>>>, AppError> {
+    Ok(Json(ApiResponse::new(repo::list_schedules(&pool).await?)))
+}
 
-// /// GET /schedules/:id — get a single schedule.
-// pub async fn get_schedule(
-//     State(state): State<AppState>,
-//     Path(id): Path<String>,
-// ) -> Result<Json<Schedule>, StatusCode> {
-//     state
-//         .db
-//         .get_schedule(&id)
-//         .map(Json)
-//         .map_err(|_| StatusCode::NOT_FOUND)
-// }
+/// GET /v1/schedules/{id} — fetch a single schedule.
+#[utoipa::path(
+    get,
+    path = "/v1/schedules/{id}",
+    tag = "schedules",
+    params(
+        ("id" = String, Path, description = "Schedule id"),
+    ),
+    responses(
+        (status = 200, description = "The requested schedule", body = ApiResponse<Schedule>),
+        (status = 404, description = "Schedule not found"),
+    )
+)]
+pub async fn get_schedule(
+    State(pool): State<Pool>,
+    Path(id): Path<String>,
+) -> Result<Json<ApiResponse<Schedule>>, AppError> {
+    Ok(Json(ApiResponse::new(repo::get_schedule(&pool, &id).await?)))
+}
 
-// /// PUT /schedules/:id — update a schedule and reload its cron job.
-// pub async fn update_schedule(
-//     State(state): State<AppState>,
-//     Path(id): Path<String>,
-//     Json(body): Json<UpdateScheduleRequest>,
-// ) -> Result<Json<Schedule>, StatusCode> {
-//     // Validate action if provided
-//     if let Some(ref action) = body.action {
-//         if action != "on" && action != "off" {
-//             return Err(StatusCode::BAD_REQUEST);
-//         }
-//     }
+/// PUT /v1/schedules/{id} — update any subset of a schedule's fields.
+#[utoipa::path(
+    put,
+    path = "/v1/schedules/{id}",
+    tag = "schedules",
+    params(
+        ("id" = String, Path, description = "Schedule id"),
+    ),
+    request_body = UpdateScheduleRequest,
+    responses(
+        (status = 200, description = "Schedule updated", body = ApiResponse<Schedule>),
+        (status = 400, description = "Invalid request body"),
+        (status = 404, description = "Schedule not found"),
+    )
+)]
+pub async fn update_schedule(
+    State(pool): State<Pool>,
+    Path(id): Path<String>,
+    Json(body): Json<UpdateScheduleRequest>,
+) -> Result<Json<ApiResponse<Schedule>>, AppError> {
+    if let Some(ref action) = body.action {
+        check_action(action)?;
+    }
+    let schedule = repo::update_schedule(
+        &pool,
+        &id,
+        body.name,
+        body.cron_expr,
+        body.action,
+        body.enabled,
+    )
+    .await?;
+    Ok(Json(ApiResponse::new(schedule)))
+}
 
-//     let schedule = state
-//         .db
-//         .update_schedule(
-//             &id,
-//             body.name.as_deref(),
-//             body.cron_expr.as_deref(),
-//             body.action.as_deref(),
-//             body.enabled,
-//         )
-//         .map_err(|_| StatusCode::NOT_FOUND)?;
-
-//     // Reload the cron job (removes old, adds new if enabled)
-//     state
-//         .scheduler
-//         .reload_job(&schedule)
-//         .await
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-//     Ok(Json(schedule))
-// }
-
-// /// DELETE /schedules/:id — delete a schedule and remove its cron job.
-// pub async fn delete_schedule(
-//     State(state): State<AppState>,
-//     Path(id): Path<String>,
-// ) -> Result<StatusCode, StatusCode> {
-//     // Remove cron job first
-//     state
-//         .scheduler
-//         .remove_job(&id)
-//         .await
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-//     let deleted = state
-//         .db
-//         .delete_schedule(&id)
-//         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-//     if deleted {
-//         Ok(StatusCode::NO_CONTENT)
-//     } else {
-//         Err(StatusCode::NOT_FOUND)
-//     }
-// }
+/// DELETE /v1/schedules/{id} — delete a schedule.
+#[utoipa::path(
+    delete,
+    path = "/v1/schedules/{id}",
+    tag = "schedules",
+    params(
+        ("id" = String, Path, description = "Schedule id"),
+    ),
+    responses(
+        (status = 200, description = "Schedule deleted", body = ApiResponse<Schedule>),
+        (status = 404, description = "Schedule not found"),
+    )
+)]
+pub async fn delete_schedule(
+    State(pool): State<Pool>,
+    Path(id): Path<String>,
+) -> Result<Json<ApiResponse<Schedule>>, AppError> {
+    Ok(Json(ApiResponse::new(repo::delete_schedule(&pool, &id).await?)))
+}
