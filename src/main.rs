@@ -1,23 +1,9 @@
-use bulb_api::{db, handlers};
-
-use axum::{
-    routing::{get, post, put},
-    Router,
-};
+use bulb_api::{api, db, openapi::ApiDoc};
 
 use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
-
-use crate::handlers::{
-    ApiDoc,
-    get_bulb,
-    get_bulb_v2,
-    bulb_on,
-    bulb_off,
-    set_bulb,
-    not_found,
-};
 
 #[tokio::main]
 async fn main() {
@@ -55,23 +41,16 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        // Bulb routes
-        .route("/bulb", get(get_bulb))// v1 — legacy flat shape (IoT device)
-        .route("/bulb", put(set_bulb))// v1 — legacy flat shape (IoT device)
-        .route("/v2/bulb", get(get_bulb_v2)) // v2 — ApiResponse envelope
-        .route("/bulb/on", post(bulb_on))
-        .route("/bulb/off", post(bulb_off))
-        // // Schedule routes
-        // .route("/schedules", get(list_schedules).post(create_schedule))
-        // .route(
-        //     "/schedules/{id}",
-        //     get(get_schedule).put(update_schedule).delete(delete_schedule),
-        // )
-        // OpenAPI JSON + Swagger UI
-        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
+    // One router description, split into the thing that serves traffic and the
+    // thing that documents it.
+    let (routes, api_doc) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .merge(api::router())
+        .split_for_parts();
+
+    let app = routes
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", api_doc))
         .layer(cors)
-        .fallback(not_found)
+        .fallback(api::not_found)
         .with_state(pool);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
