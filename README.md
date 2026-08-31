@@ -32,12 +32,13 @@ The server starts on **`http://0.0.0.0:3000`**. The SQLite database file (`bulb.
 
 ## API Endpoints
 
-| Method | Path         | Description              | Request Body            |
-|--------|-------------|--------------------------|-------------------------|
-| `GET`  | `/bulb`     | Get current bulb state   | —                       |
-| `POST` | `/bulb/on`  | Turn bulb on             | —                       |
-| `POST` | `/bulb/off` | Turn bulb off            | —                       |
-| `PUT`  | `/bulb`     | Set bulb state           | `{"is_on": true/false}` |
+| Method | Path           | Description              | Request Body            |
+|--------|----------------|--------------------------|-------------------------|
+| `GET`  | `/bulb`        | Get bulb state (IoT poll)| —                       |
+| `GET`  | `/v1/bulb`     | Get bulb state           | —                       |
+| `POST` | `/v1/bulb/on`  | Turn bulb on             | —                       |
+| `POST` | `/v1/bulb/off` | Turn bulb off            | —                       |
+| `PUT`  | `/v1/bulb`     | Set bulb state           | `{"is_on": true/false}` |
 
 All responses share the same shape:
 
@@ -51,17 +52,20 @@ All responses share the same shape:
 ### Example requests
 
 ```bash
-# Check state
+# Check state (IoT poll — unversioned)
 curl http://localhost:3000/bulb
 
+# Get state (v1)
+curl http://localhost:3000/v1/bulb
+
 # Turn on
-curl -X POST http://localhost:3000/bulb/on
+curl -X POST http://localhost:3000/v1/bulb/on
 
 # Turn off
-curl -X POST http://localhost:3000/bulb/off
+curl -X POST http://localhost:3000/v1/bulb/off
 
 # Set via JSON body
-curl -X PUT http://localhost:3000/bulb \
+curl -X PUT http://localhost:3000/v1/bulb \
   -H "Content-Type: application/json" \
   -d '{"is_on": true}'
 ```
@@ -144,11 +148,11 @@ plus an optional push-button to toggle locally and `PUT` the new state back to t
 | Step | What to do | Expected result |
 |------|-----------|-----------------|
 | **1** | Start the server: `cargo run` | `💡 Bulb API listening on http://0.0.0.0:3000` |
-| **2** | Test from terminal: `curl -X POST http://localhost:3000/bulb/on` | `{"is_on":true,"updated_at":"..."}` |
+| **2** | Test from terminal: `curl -X POST http://localhost:3000/v1/bulb/on` | `{"is_on":true,"updated_at":"..."}` |
 | **3** | Power up ESP8266 via USB | Serial monitor shows WiFi connected, relay state |
-| **4** | Turn on via server: `curl -X POST http://localhost:3000/bulb/on` | Relay clicks ON, bulb lights |
-| **5** | Turn off via server: `curl -X POST http://localhost:3000/bulb/off` | Relay clicks OFF, bulb off |
-| **6** | Press the physical button | Relay toggles, server state syncs (`PUT /bulb`) |
+| **4** | Turn on via server: `curl -X POST http://localhost:3000/v1/bulb/on` | Relay clicks ON, bulb lights |
+| **5** | Turn off via server: `curl -X POST http://localhost:3000/v1/bulb/off` | Relay clicks OFF, bulb off |
+| **6** | Press the physical button | Relay toggles, server state syncs (`PUT /v1/bulb`) |
 | **7** | Verify sync: `curl http://localhost:3000/bulb` | Returns `is_on` matching the relay |
 
 ### How the polling works
@@ -161,7 +165,7 @@ Every 2 seconds:
 
 Button press (instant):
   ESP8266 toggles relay locally
-  ESP8266 ── PUT /bulb {"is_on":false} ──► Server
+  ESP8266 ── PUT /v1/bulb {"is_on":false} ──► Server
 ```
 
 The server is the source of truth. The ESP always follows whatever `GET /bulb` returns. The button is a convenience that syncs back to the server so state stays consistent.

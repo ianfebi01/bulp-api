@@ -12,11 +12,12 @@ use super::repo;
 use crate::api::response::ApiResponse;
 use crate::error::AppError;
 
-/// GET /bulb — v1, legacy flat response consumed by the IoT device.
+/// GET /bulb — legacy flat response consumed by the IoT device.
 ///
-/// Keeps the original shape `{ is_on, updated_at }` with `updated_at` as the
-/// raw Postgres text rendering. Do NOT change this — devices depend on it.
-/// New clients should use `GET /v2/bulb` (see [`get_bulb_v2`]).
+/// Unversioned on purpose: deployed devices poll this exact path, so it must
+/// not move. Keeps the original shape `{ is_on, updated_at }` with `updated_at`
+/// as the raw Postgres text rendering. Do NOT change this — devices depend on it.
+/// New clients should use `GET /v1/bulb` (see [`get_bulb_v1`]).
 #[utoipa::path(
     get,
     path = "/bulb",
@@ -31,10 +32,10 @@ pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbStateV1>, App
     Ok(Json(repo::find_v1(&pool).await?))
 }
 
-/// GET /v2/bulb — return current bulb state in the standard envelope.
+/// GET /v1/bulb — return current bulb state in the standard envelope.
 #[utoipa::path(
     get,
-    path = "/v2/bulb",
+    path = "/v1/bulb",
     tag = "bulb",
     responses(
         (status = 200, description = "Current bulb state", body = ApiResponse<BulbState>),
@@ -42,16 +43,16 @@ pub async fn get_bulb(State(pool): State<Pool>) -> Result<Json<BulbStateV1>, App
         (status = 500, description = "Internal error"),
     )
 )]
-pub async fn get_bulb_v2(
+pub async fn get_bulb_v1(
     State(pool): State<Pool>,
 ) -> Result<Json<ApiResponse<BulbState>>, AppError> {
     Ok(Json(ApiResponse::new(repo::find(&pool).await?)))
 }
 
-/// PUT /bulb — set bulb state via JSON body { "is_on": true/false }.
+/// PUT /v1/bulb — set bulb state via JSON body { "is_on": true/false }.
 #[utoipa::path(
     put,
-    path = "/bulb",
+    path = "/v1/bulb",
     tag = "bulb",
     request_body = SetBulbRequest,
     responses(
@@ -66,10 +67,10 @@ pub async fn set_bulb(
     Ok(Json(ApiResponse::new(repo::set(&pool, body.is_on).await?)))
 }
 
-/// POST /bulb/on — turn the bulb on.
+/// POST /v1/bulb/on — turn the bulb on.
 #[utoipa::path(
     post,
-    path = "/bulb/on",
+    path = "/v1/bulb/on",
     tag = "bulb",
     responses(
         (status = 200, description = "Bulb turned on", body = ApiResponse<BulbState>),
@@ -80,10 +81,10 @@ pub async fn bulb_on(State(pool): State<Pool>) -> Result<Json<ApiResponse<BulbSt
     Ok(Json(ApiResponse::new(repo::set(&pool, true).await?)))
 }
 
-/// POST /bulb/off — turn the bulb off.
+/// POST /v1/bulb/off — turn the bulb off.
 #[utoipa::path(
     post,
-    path = "/bulb/off",
+    path = "/v1/bulb/off",
     tag = "bulb",
     responses(
         (status = 200, description = "Bulb turned off", body = ApiResponse<BulbState>),

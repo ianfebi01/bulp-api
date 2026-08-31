@@ -14,11 +14,14 @@ use handlers::*;
 /// `routes!` reads the URL and method straight off each handler's
 /// `#[utoipa::path]`, so there is no route string to keep in sync here.
 /// Handlers sharing a URL must be listed in the same `routes!` call — that is
-/// what turns `GET`/`PUT` on `/bulb` into one method router.
+/// what turns `GET`/`PUT` on `/v1/bulb` into one method router.
+///
+/// Only `GET /bulb` is unversioned — it is the endpoint polled by deployed
+/// IoT devices and must not move. Every other route lives under `/v1/`.
 pub fn router() -> OpenApiRouter<Pool> {
     OpenApiRouter::new()
-        .routes(routes!(get_bulb, set_bulb))
-        .routes(routes!(get_bulb_v2))
+        .routes(routes!(get_bulb))
+        .routes(routes!(get_bulb_v1, set_bulb))
         .routes(routes!(bulb_on))
         .routes(routes!(bulb_off))
 }

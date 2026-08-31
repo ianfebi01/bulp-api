@@ -23,7 +23,7 @@
       "name": "Turn bulb on",
       "request": {
         "method": "POST",
-        "url": "{{baseUrl}}/bulb/on",
+        "url": "{{baseUrl}}/v1/bulb/on",
         "description": "Turns the bulb on."
       }
     },
@@ -31,7 +31,7 @@
       "name": "Turn bulb off",
       "request": {
         "method": "POST",
-        "url": "{{baseUrl}}/bulb/off",
+        "url": "{{baseUrl}}/v1/bulb/off",
         "description": "Turns the bulb off."
       }
     },
@@ -39,7 +39,7 @@
       "name": "Set bulb state",
       "request": {
         "method": "PUT",
-        "url": "{{baseUrl}}/bulb",
+        "url": "{{baseUrl}}/v1/bulb",
         "description": "Set the bulb on or off via JSON body.",
         "header": [
           {

@@ -10,11 +10,11 @@ use crate::error::AppError;
 
 /// Compose every resource router into the public API surface.
 ///
-/// Resource modules are merged at the root because the v1 URLs (`/bulb`,
-/// `/bulb/on`, …) are consumed by deployed IoT devices and must not move. A
-/// new resource with a clean prefix should be nested instead, e.g.
-/// `.nest("/schedules", schedule::router())`, which prefixes both the axum
-/// routes and the OpenAPI paths in one step.
+/// Every route is served under `/v1/` except `GET /bulb`, which is polled by
+/// deployed IoT devices and must not move — so the bulb router is merged at the
+/// root rather than nested. New resources should be nested under the `v1`
+/// prefix, e.g. `.nest("/v1/schedules", schedule::router())`, which prefixes
+/// both the axum routes and the OpenAPI paths in one step.
 pub fn router() -> OpenApiRouter<Pool> {
     OpenApiRouter::new().merge(bulb::router())
 }

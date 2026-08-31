@@ -15,7 +15,7 @@ pub struct BulbStateV1 {
     pub updated_at: String,
 }
 
-/// v2 bulb response — typed timestamp, returned inside `ApiResponse`.
+/// v1 bulb response — typed timestamp, returned inside `ApiResponse`.
 #[derive(Serialize, ToSchema)]
 pub struct BulbState {
     #[schema(example = true)]
@@ -25,7 +25,7 @@ pub struct BulbState {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Request body for PUT /bulb
+/// Request body for PUT /v1/bulb
 #[derive(Deserialize, ToSchema)]
 pub struct SetBulbRequest {
     #[schema(example = true)]
