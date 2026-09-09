@@ -131,6 +131,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "chrono",
+ "chrono-tz",
  "deadpool-postgres",
  "dotenvy",
  "refinery",
@@ -1148,6 +1149,7 @@ dependencies = [
  "chrono",
  "fallible-iterator 0.2.0",
  "postgres-protocol",
+ "uuid",
 ]
 
 [[package]]

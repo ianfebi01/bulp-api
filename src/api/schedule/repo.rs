@@ -22,22 +22,22 @@ fn schedule_from_row(row: &tokio_postgres::Row) -> Schedule {
     }
 }
 
-/// Create a schedule, generating a fresh UUID id.
+/// Create a schedule. The id comes from the column's `gen_random_uuid()`
+/// default, so there is only one place that decides what an id looks like.
 pub async fn create_schedule(
     pool: &Pool,
     name: String,
     cron_expr: String,
     action: String,
 ) -> Result<Schedule, AppError> {
-    let id = Uuid::new_v4().to_string();
     let sql = format!(
-        "INSERT INTO schedules (id, name, cron_expr, action) \
-         VALUES ($1, $2, $3, $4) RETURNING {COLS}"
+        "INSERT INTO schedules (name, cron_expr, action) \
+         VALUES ($1, $2, $3) RETURNING {COLS}"
     );
     let row = pool
         .get()
         .await?
-        .query_opt(&sql, &[&id, &name, &cron_expr, &action])
+        .query_opt(&sql, &[&name, &cron_expr, &action])
         .await?
         .ok_or_else(|| AppError::Internal("create_schedule returned no row".into()))?;
 
@@ -51,8 +51,16 @@ pub async fn list_schedules(pool: &Pool) -> Result<Vec<Schedule>, AppError> {
     Ok(rows.iter().map(schedule_from_row).collect())
 }
 
+/// Only the schedules that should currently have a cron job — used at startup
+/// to rebuild the scheduler from the database.
+pub async fn list_enabled(pool: &Pool) -> Result<Vec<Schedule>, AppError> {
+    let sql = format!("SELECT {COLS} FROM schedules WHERE enabled ORDER BY created_at");
+    let rows = pool.get().await?.query(&sql, &[]).await?;
+    Ok(rows.iter().map(schedule_from_row).collect())
+}
+
 /// Fetch a single schedule by id.
-pub async fn get_schedule(pool: &Pool, id: &str) -> Result<Schedule, AppError> {
+pub async fn get_schedule(pool: &Pool, id: Uuid) -> Result<Schedule, AppError> {
     let sql = format!("SELECT {COLS} FROM schedules WHERE id = $1");
     let row = pool
         .get()
@@ -67,7 +75,7 @@ pub async fn get_schedule(pool: &Pool, id: &str) -> Result<Schedule, AppError> {
 /// Update any subset of fields; unspecified fields keep their current value.
 pub async fn update_schedule(
     pool: &Pool,
-    id: &str,
+    id: Uuid,
     name: Option<String>,
     cron_expr: Option<String>,
     action: Option<String>,
@@ -93,7 +101,7 @@ pub async fn update_schedule(
 }
 
 /// Delete a schedule and return the removed row.
-pub async fn delete_schedule(pool: &Pool, id: &str) -> Result<Schedule, AppError> {
+pub async fn delete_schedule(pool: &Pool, id: Uuid) -> Result<Schedule, AppError> {
     let sql = format!("DELETE FROM schedules WHERE id = $1 RETURNING {COLS}");
     let row = pool
         .get()

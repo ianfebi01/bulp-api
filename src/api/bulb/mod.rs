@@ -1,9 +1,12 @@
 pub mod dto;
 pub mod handlers;
-mod repo;
+// `pub(crate)` rather than private: the schedule runner writes bulb state
+// when a cron job fires, and it goes through this repo like everything else.
+pub(crate) mod repo;
 
-use deadpool_postgres::Pool;
 use utoipa_axum::{router::OpenApiRouter, routes};
+
+use crate::state::AppState;
 
 // Brings both the handler fns and the `__path_*` types that `#[utoipa::path]`
 // generates alongside them into scope, which is what `routes!` needs.
@@ -18,7 +21,7 @@ use handlers::*;
 ///
 /// Only `GET /bulb` is unversioned — it is the endpoint polled by deployed
 /// IoT devices and must not move. Every other route lives under `/v1/`.
-pub fn router() -> OpenApiRouter<Pool> {
+pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(get_bulb))
         .routes(routes!(get_bulb_v1, set_bulb))

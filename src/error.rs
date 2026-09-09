@@ -32,6 +32,26 @@ impl From<tokio_postgres::Error> for AppError {
     }
 }
 
+/// The scheduler's own error type, translated into an HTTP-shaped one.
+///
+/// This is the whole reason handlers can write `runner.sync(&schedule).await?`:
+/// `?` converts through `From`, so the runner never has to know about HTTP and
+/// the handler never has to match on scheduler internals.
+impl From<tokio_cron_scheduler::JobSchedulerError> for AppError {
+    fn from(e: tokio_cron_scheduler::JobSchedulerError) -> Self {
+        use tokio_cron_scheduler::JobSchedulerError;
+        match e {
+            // The one failure a client can actually cause.
+            JobSchedulerError::ParseSchedule => AppError::BadRequest(
+                "invalid cron expression — expected six space-separated fields, \
+                 seconds first (e.g. \"0 53 13 * * *\" = 13:53:00 daily)"
+                    .into(),
+            ),
+            other => AppError::Internal(format!("scheduler error: {other}")),
+        }
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, code, message) = match self {

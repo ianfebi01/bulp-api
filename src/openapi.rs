@@ -15,7 +15,7 @@ use utoipa::OpenApi;
     ),
     tags(
         (name = "bulb", description = "Bulb state endpoints"),
-        (name = "schedule", description = "Cron schedules for the bulb"),
+        (name = "schedules", description = "Cron schedules for the bulb"),
     )
 )]
 pub struct ApiDoc;
