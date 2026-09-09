@@ -1,2 +1,5 @@
 /target
 .omc
+.env
+# Local SQLite leftover from the pre-Postgres version
+bulb.db

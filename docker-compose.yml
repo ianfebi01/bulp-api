@@ -1,12 +1,64 @@
+# Local full-stack run: builds the image from source and starts Postgres
+# alongside it, with the same database → migrate → api ordering as production.
+#
+# Reads PG_USER / PG_PASSWORD / PG_DBNAME from your .env (see .env.example).
+# For day-to-day development you probably want docker-compose.dev.yml instead —
+# that starts only Postgres, and you run `cargo run` on the host.
 services:
+  database:
+    image: postgres:16
+    container_name: bulb-api-db-local
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: ${PG_DBNAME}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    ports:
+      - "5431:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  migrate:
+    build: .
+    container_name: bulb-api-migrate-local
+    command: ["./migrate"]
+    environment:
+      # Inside the compose network the database is reachable by service name,
+      # on its container port — not the 5431 published to the host.
+      PG_HOST: database
+      PG_PORT: 5432
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DBNAME: ${PG_DBNAME}
+    depends_on:
+      database:
+        condition: service_healthy
+    restart: "no"
+
   bulb-api:
     build: .
-    container_name: bulb-api
+    container_name: bulb-api-local
     ports:
       - "3000:3000"
-    volumes:
-      - bulb-data:/app/data
+    environment:
+      PG_HOST: database
+      PG_PORT: 5432
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DBNAME: ${PG_DBNAME}
+      SCHEDULE_TZ: ${SCHEDULE_TZ:-Asia/Jakarta}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:
-  bulb-data:
+  db_data:
+    driver: local

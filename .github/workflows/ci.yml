@@ -1,0 +1,137 @@
+# Checks that must pass before anything is deployed.
+#
+# Runs on every pull request, and is also called by deploy.yml before it builds
+# and pushes an image (`uses: ./.github/workflows/ci.yml`), so main can never
+# deploy something that does not compile or does not boot.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+jobs:
+  check:
+    name: Build and lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@v2
+
+      # `--locked` fails if Cargo.lock is stale, which keeps CI, Docker and
+      # local builds on identical dependency versions.
+      - name: Build all binaries
+        run: cargo build --locked --bins
+
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --locked
+
+      # Informational only: the repo is not currently rustfmt-clean. Run
+      # `cargo fmt` once, then drop this `continue-on-error` to enforce it.
+      - name: Formatting (non-blocking)
+        run: cargo fmt --check
+        continue-on-error: true
+
+  smoke:
+    name: End-to-end smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Builds the real Docker image and runs the real stack — Postgres,
+      # migrations, then the server — exactly as production does. This is the
+      # check that catches a Dockerfile missing `migrations/`, a compose file
+      # missing PG_* vars, or a server that cannot reach its database.
+      - name: Start the full stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait
+          docker compose ps
+
+      - name: Wait for the API to answer
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/bulb >/dev/null 2>&1; then
+              echo "API is up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "API never became reachable"; exit 1
+
+      - name: Migrations actually applied
+        run: |
+          docker compose logs migrate
+          docker compose logs migrate | grep -qE "applied: V1|no new migrations" \
+            || { echo "migrate did not report applying the schema"; exit 1; }
+
+      - name: Bulb endpoints
+        run: |
+          set -euo pipefail
+          curl -fsS http://localhost:3000/bulb | tee /dev/stderr | grep -q '"is_on"'
+          curl -fsS -X POST http://localhost:3000/v1/bulb/on  | grep -q '"is_on":true'
+          curl -fsS -X POST http://localhost:3000/v1/bulb/off | grep -q '"is_on":false'
+          curl -fsS -X PUT http://localhost:3000/v1/bulb \
+            -H 'Content-Type: application/json' -d '{"is_on":true}' | grep -q '"success":true'
+
+      - name: Schedule endpoints (create, run, update, delete)
+        run: |
+          set -euo pipefail
+          B=http://localhost:3000
+
+          # A schedule that fires every 2 seconds proves the cron runner is
+          # alive, not merely that rows can be written.
+          curl -fsS -o /dev/null -X PUT "$B/v1/bulb" \
+            -H 'Content-Type: application/json' -d '{"is_on":false}'
+
+          ID=$(curl -fsS -X POST "$B/v1/schedules" \
+                 -H 'Content-Type: application/json' \
+                 -d '{"name":"ci","cron_expr":"*/2 * * * * *","action":"on"}' \
+               | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["id"])')
+          echo "created $ID"
+
+          sleep 5
+          curl -fsS "$B/v1/bulb" | tee /dev/stderr | grep -q '"is_on":true' \
+            || { echo "cron job never fired"; docker compose logs bulb-api; exit 1; }
+
+          curl -fsS "$B/v1/schedules" | grep -q "$ID"
+          curl -fsS "$B/v1/schedules/$ID" | grep -q '"success":true'
+          curl -fsS -X PUT "$B/v1/schedules/$ID" \
+            -H 'Content-Type: application/json' -d '{"enabled":false}' | grep -q '"enabled":false'
+          curl -fsS -X DELETE "$B/v1/schedules/$ID" | grep -q '"success":true'
+
+      - name: Rejects bad input
+        run: |
+          set -euo pipefail
+          B=http://localhost:3000
+          code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
+
+          [ "$(code -X POST $B/v1/schedules -H 'Content-Type: application/json' \
+                -d '{"name":"x","cron_expr":"0 0 5 * * *","action":"nope"}')" = 400 ]
+          # A 5-field crontab expression must be rejected, not silently accepted.
+          [ "$(code -X POST $B/v1/schedules -H 'Content-Type: application/json' \
+                -d '{"name":"x","cron_expr":"0 5 * * *","action":"on"}')" = 400 ]
+          [ "$(code $B/v1/schedules/not-a-uuid)" = 400 ]
+          [ "$(code $B/v1/schedules/00000000-0000-0000-0000-000000000000)" = 404 ]
+          [ "$(code $B/v1/nope)" = 404 ]
+          echo "all rejections correct"
+
+      - name: Server logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

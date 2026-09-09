@@ -1,57 +1,176 @@
 {
   "info": {
     "name": "Bulb API",
-    "description": "On/off bulb control API for ESP32",
+    "description": "On/off bulb control API for ESP32, with cron schedules.\n\nInteractive docs: {{baseUrl}}/docs (Swagger UI).\n\nGET /bulb is unversioned and frozen — deployed devices poll it. Every /v1/ endpoint returns a { success, data } envelope.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     {
       "key": "baseUrl",
       "value": "http://localhost:3000"
+    },
+    {
+      "key": "scheduleId",
+      "value": "",
+      "description": "Filled in automatically by 'Create schedule'."
     }
   ],
   "item": [
     {
-      "name": "Get bulb state",
-      "request": {
-        "method": "GET",
-        "url": "{{baseUrl}}/bulb",
-        "description": "Returns whether the bulb is on/off and when it was last updated."
-      }
-    },
-    {
-      "name": "Turn bulb on",
-      "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/bulb/on",
-        "description": "Turns the bulb on."
-      }
-    },
-    {
-      "name": "Turn bulb off",
-      "request": {
-        "method": "POST",
-        "url": "{{baseUrl}}/bulb/off",
-        "description": "Turns the bulb off."
-      }
-    },
-    {
-      "name": "Set bulb state",
-      "request": {
-        "method": "PUT",
-        "url": "{{baseUrl}}/bulb",
-        "description": "Set the bulb on or off via JSON body.",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+      "name": "Bulb",
+      "item": [
+        {
+          "name": "Get bulb state (IoT poll)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bulb",
+            "description": "Unversioned, frozen shape { is_on, updated_at } polled by deployed devices. Do not change this endpoint."
           }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\"is_on\": true}"
+        },
+        {
+          "name": "Get bulb state (v1)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/bulb",
+            "description": "Current state inside the standard envelope, with an RFC 3339 timestamp."
+          }
+        },
+        {
+          "name": "Set bulb state",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/v1/bulb",
+            "description": "Set the bulb on or off via JSON body.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"is_on\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Turn bulb on",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/bulb/on",
+            "description": "Turns the bulb on."
+          }
+        },
+        {
+          "name": "Turn bulb off",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/bulb/off",
+            "description": "Turns the bulb off."
+          }
         }
-      }
+      ]
+    },
+    {
+      "name": "Schedules",
+      "description": "Cron schedules that switch the bulb on or off. Cron is SIX fields, seconds first: 'second minute hour day-of-month month day-of-week'. Fields are read in the server's SCHEDULE_TZ (default Asia/Jakarta), so \"0 0 5 * * *\" means 05:00 local time — not UTC. A 5-field crontab expression is rejected with a 400.",
+      "item": [
+        {
+          "name": "Create schedule",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/schedules",
+            "description": "Create a schedule and start running it immediately.\n\nCron is SIX fields, seconds first: 'second minute hour day-of-month month day-of-week'. Fields are read in the server's SCHEDULE_TZ (default Asia/Jakarta), so \"0 0 5 * * *\" means 05:00 local time — not UTC. A 5-field crontab expression is rejected with a 400.\n\n'action' must be \"on\" or \"off\". The cron expression is validated before anything is written, so an invalid one leaves no row behind.\n\nThis request saves the new id into {{scheduleId}} for the requests below.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Turn on every morning\",\n  \"cron_expr\": \"0 0 5 * * *\",\n  \"action\": \"on\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Save the new schedule's id into {{scheduleId}} so the requests",
+                  "// below (get / update / disable / delete) work without copy-pasting.",
+                  "const body = pm.response.json();",
+                  "if (pm.response.code === 200 && body.success) {",
+                  "    pm.collectionVariables.set('scheduleId', body.data.id);",
+                  "    console.log('scheduleId =', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List schedules",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/schedules",
+            "description": "All schedules, oldest first."
+          }
+        },
+        {
+          "name": "Get schedule",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/schedules/{{scheduleId}}",
+            "description": "One schedule by id. 400 if the id is not a UUID, 404 if unknown."
+          }
+        },
+        {
+          "name": "Update schedule",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/v1/schedules/{{scheduleId}}",
+            "description": "Update any subset of name / cron_expr / action / enabled — omitted fields keep their current value.\n\nThe running cron job is replaced, so a new time takes effect immediately rather than at the next restart.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cron_expr\": \"0 30 6 * * *\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Disable schedule (pause)",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/v1/schedules/{{scheduleId}}",
+            "description": "Stop the job without deleting the row. Send { \"enabled\": true } to resume it.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": false\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete schedule",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/v1/schedules/{{scheduleId}}",
+            "description": "Delete the schedule and stop its job. Returns the row that was removed."
+          }
+        }
+      ]
     }
   ]
 }

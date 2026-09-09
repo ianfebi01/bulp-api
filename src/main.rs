@@ -1,55 +1,45 @@
-mod db;
-mod handlers;
-mod models;
-mod scheduler;
-
-use axum::{
-    routing::{get, post},
-    Router,
-};
 use std::sync::Arc;
-use tower_http::cors::{Any, CorsLayer};
 
-use crate::db::Db;
-use crate::handlers::{
-    bulb_off, bulb_on, create_schedule, delete_schedule, get_bulb, get_schedule, list_schedules,
-    set_bulb, update_schedule, AppState,
-};
-use crate::scheduler::ScheduleRunner;
+use bulb_api::{api, api::schedule::runner::ScheduleRunner, db, openapi::ApiDoc, state::AppState};
+
+use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() {
-    // Structured logging
+    // Structured logging. Set RUST_LOG=info to see the scheduler's output.
     tracing_subscriber::fmt::init();
 
-    // Open (or create) the SQLite database — path from env or default
-    let db_path = std::env::var("BULB_DB_PATH").unwrap_or_else(|_| "bulb.db".into());
-    let db = Arc::new(Db::open(&db_path).expect("Failed to open database"));
+    dotenvy::dotenv().ok();
 
-    // ── Scheduler: crash recovery ───────────────────────────────────
-    let runner = Arc::new(
-        ScheduleRunner::new(Arc::clone(&db))
-            .await
-            .expect("Failed to create scheduler"),
+    let pool = db::create_pool();
+
+    // ── Scheduler ───────────────────────────────────────────────────
+    // Built once, before the server, and shared with every request through
+    // `AppState`. `start()` spawns the background tick loop, so nothing here
+    // needs a `loop { sleep }` of its own — the tasks run alongside axum.
+    let runner = ScheduleRunner::start(pool.clone())
+        .await
+        .expect("failed to start scheduler");
+
+    // Crash recovery: jobs live only in memory, so rebuild them from the
+    // database on every boot. Fatal on purpose — booting with an unknown set of
+    // schedules is worse than not booting at all.
+    let loaded = runner
+        .load_from_db()
+        .await
+        .expect("failed to load schedules from database");
+    tracing::info!(
+        "scheduler started with {loaded} enabled schedule(s); cron expressions \
+         are read in {}",
+        runner.timezone()
     );
 
-    // Reload all enabled schedules from DB (crash-recovery path).
-    runner
-        .load_all_from_db()
-        .await
-        .expect("Failed to load schedules from database");
-
-    // Start the background cron loop.
-    runner
-        .start()
-        .await
-        .expect("Failed to start scheduler");
-
-    tracing::info!("Scheduler started — cron jobs are running");
-
     let state = AppState {
-        db,
-        scheduler: runner,
+        pool,
+        runner: Arc::clone(&runner),
     };
 
     // CORS — allow all origins for ESP32 access
@@ -58,23 +48,23 @@ async fn main() {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        // Bulb routes
-        .route("/bulb", get(get_bulb).put(set_bulb))
-        .route("/bulb/on", post(bulb_on))
-        .route("/bulb/off", post(bulb_off))
-        // Schedule routes
-        .route("/schedules", get(list_schedules).post(create_schedule))
-        .route(
-            "/schedules/{id}",
-            get(get_schedule).put(update_schedule).delete(delete_schedule),
-        )
+    // One router description, split into the thing that serves traffic and the
+    // thing that documents it.
+    let (routes, api_doc) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .merge(api::router())
+        .split_for_parts();
+
+    let app = routes
+        .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", api_doc))
         .layer(cors)
+        .fallback(api::not_found)
         .with_state(state);
 
-    let addr = "0.0.0.0:3000";
-    tracing::info!("💡 Bulb API listening on http://{}", addr);
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+        .await
+        .expect("failed to bind port 3000");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    tracing::info!("listening on http://0.0.0.0:3000");
+    tracing::info!("swagger ui on http://0.0.0.0:3000/docs");
+    axum::serve(listener, app).await.expect("server error");
 }

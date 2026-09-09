@@ -1,16 +1,77 @@
+# Production stack, deployed to the VPS by .github/workflows/deploy.yml.
+#
+# Startup order is enforced, not hoped for:
+#   database (healthy) → migrate (exits 0) → bulb-api
+#
+# Configuration comes from a `.env` file written next to this one by the deploy
+# workflow from GitHub secrets. Compose reads it twice, on purpose: for `${...}`
+# substitution below, and via `env_file:` to inject the vars into containers.
 services:
+  database:
+    image: postgres:16
+    container_name: bulb-api-db
+    environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
+      POSTGRES_DB: ${PG_DBNAME}
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    # No `ports:` — the database is reachable only on the internal network,
+    # never from the public internet.
+    networks:
+      - internal
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    # This is what makes `depends_on: service_healthy` meaningful: Postgres
+    # accepts TCP connections well before it is ready to answer queries.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # One-shot: applies migrations/ then exits. The API is not allowed to start
+  # until this exits 0, so the server never boots against a missing schema.
+  migrate:
+    image: ghcr.io/ianfebi01/bulb-api:latest
+    container_name: bulb-api-migrate
+    command: ["./migrate"]
+    env_file:
+      - .env
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
+
   bulb-api:
     image: ghcr.io/ianfebi01/bulb-api:latest
     container_name: bulb-api
-    volumes:
-      - bulb-data:/app/data
-    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # `internal` to reach the database, `proxy` so the reverse proxy can reach
+    # the API. Port 3000 is deliberately not published to the host.
     networks:
+      - internal
       - proxy
+    restart: unless-stopped
 
 networks:
+  internal:
+    driver: bridge
   proxy:
     external: true
 
 volumes:
-  bulb-data:
+  db_data:
+    driver: local
