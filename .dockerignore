@@ -11,7 +11,7 @@
 .vscode
 .idea
 
-# Database (use a volume)
+# Leftover SQLite file from the pre-Postgres version
 bulb.db
 
 # Docs & misc
@@ -21,7 +21,12 @@ README.md
 # ESP8266 firmware (not needed for the server)
 esp8266/
 
+# CI config — not needed inside the image
+.github
+
 # Docker
 Dockerfile
 .dockerignore
-docker-compose.yml
+docker-compose*.yml
+
+# NOTE: migrations/ must NOT be ignored — refinery embeds them at compile time.
