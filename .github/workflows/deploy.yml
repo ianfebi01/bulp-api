@@ -7,7 +7,14 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Reuses .github/workflows/ci.yml (build, clippy, tests, and a full
+  # docker-compose smoke test). Nothing is built or shipped unless this passes,
+  # so a broken commit on main stops here instead of reaching the VPS.
+  check:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: check
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,29 +22,33 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
+      # Tagged with the commit SHA as well as :latest, so a bad deploy can be
+      # rolled back by pinning the previous SHA in docker-compose.prod.yml.
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ghcr.io/ianfebi01/bulb-api:latest
+          tags: |
+            ghcr.io/ianfebi01/bulb-api:latest
+            ghcr.io/ianfebi01/bulb-api:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Upload docker-compose config to VPS
-        uses: appleboy/scp-action@v0.1.4
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
@@ -54,19 +65,55 @@ jobs:
 
     steps:
       - name: SSH into VPS and deploy
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          PG_USER: ${{ secrets.PG_USER }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
+          PG_DBNAME: ${{ secrets.PG_DBNAME }}
+          SCHEDULE_TZ: ${{ vars.SCHEDULE_TZ || 'Asia/Jakarta' }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          # Forwards the env block above into the remote shell so the .env file
+          # below can be written without interpolating secrets into this YAML.
+          envs: PG_USER,PG_PASSWORD,PG_DBNAME,SCHEDULE_TZ
           script: |
+            set -euo pipefail
+
             echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            cd /tmp/bulb-api
+
             mkdir -p ~/app/bulb-api
-            cp docker-compose.prod.yml ~/app/bulb-api/docker-compose.prod.yml
+            cp /tmp/bulb-api/docker-compose.prod.yml ~/app/bulb-api/docker-compose.prod.yml
             cd ~/app/bulb-api
+
+            # Configuration for both the containers (env_file:) and compose's own
+            # ${...} substitution. umask keeps the password out of world-readable
+            # files; PG_HOST is the compose service name, not localhost.
+            umask 077
+            cat > .env <<ENVFILE
+            PG_HOST=database
+            PG_PORT=5432
+            PG_USER=${PG_USER}
+            PG_PASSWORD=${PG_PASSWORD}
+            PG_DBNAME=${PG_DBNAME}
+            PG_POOL_MAX_SIZE=16
+            SCHEDULE_TZ=${SCHEDULE_TZ}
+            RUST_LOG=info
+            ENVFILE
+
+            # The reverse-proxy network is external and must already exist.
+            docker network inspect proxy >/dev/null 2>&1 || docker network create proxy
+
             docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml down
-            docker compose -f docker-compose.prod.yml up -d
+            # No `down` — recreating only what changed leaves Postgres running,
+            # and `--wait` blocks until the database is healthy and migrations
+            # have exited 0, so a failed migration fails the deploy.
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans --wait
+
+            docker compose -f docker-compose.prod.yml ps
             docker image prune -f
             rm -rf /tmp/bulb-api
+
+      - name: Report deployed image
+        run: echo "Deployed ghcr.io/ianfebi01/bulb-api:${{ github.sha }}"

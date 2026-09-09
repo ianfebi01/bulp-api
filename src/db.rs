@@ -4,7 +4,7 @@ use tokio_postgres::NoTls;
 pub fn create_pool() -> Pool {
     let mut cfg: Config = Config::new();
 
-    cfg.host = Some(std::env::var("PG_HOST").expect("PG_USER must be set"));
+    cfg.host = Some(std::env::var("PG_HOST").expect("PG_HOST must be set"));
     cfg.port = std::env::var("PG_PORT").ok().and_then(|p| p.parse().ok()).or(Some(5432));
     cfg.user = Some(std::env::var("PG_USER").expect("PG_USER must be set"));
     cfg.password = std::env::var("PG_PASSWORD").ok();
