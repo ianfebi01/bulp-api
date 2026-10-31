@@ -18,8 +18,6 @@ pub async fn register_user(
 
     let password_hash = argon2.hash_password(password.as_bytes())?.to_string();
 
-    println!("Password hash: {}", password_hash); // Debugging line
-
     let sql = format!(
         "INSERT INTO users (username, password_hash) \
          VALUES ($1, $2) RETURNING {COLS}"
