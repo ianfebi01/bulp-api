@@ -32,6 +32,12 @@ impl From<tokio_postgres::Error> for AppError {
     }
 }
 
+impl From<argon2::password_hash::Error> for AppError {
+    fn from(e: argon2::password_hash::Error) -> Self {
+        AppError::Internal(format!("password hashing error: {e}"))
+    }
+}
+
 /// The scheduler's own error type, translated into an HTTP-shaped one.
 ///
 /// This is the whole reason handlers can write `runner.sync(&schedule).await?`:

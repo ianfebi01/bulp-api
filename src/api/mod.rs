@@ -1,6 +1,7 @@
 pub mod bulb;
 pub mod response;
 pub mod schedule;
+pub mod auth;
 
 use axum::response::IntoResponse;
 use utoipa_axum::router::OpenApiRouter;
@@ -19,6 +20,7 @@ pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .merge(bulb::router())
         .merge(schedule::router())
+        .merge(auth::router())
 }
 
 /// Fallback for unmatched routes — renders the standard error envelope.
