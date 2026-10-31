@@ -18,4 +18,5 @@ use handlers::*;
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(register_user))
+        .routes(routes!(login))
 }
