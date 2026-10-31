@@ -11,7 +11,7 @@ use crate::{api::{auth::dto::{Register, RegisterUserRequest}, response::ApiRespo
     tag = "auth",
     request_body = RegisterUserRequest,
     responses(
-        (status = 200, description = "User registered", body = ApiResponse<Register>),
+        (status = 201, description = "User registered", body = ApiResponse<Register>),
         (status = 400, description = "Invalid request"),
     )
 )]
