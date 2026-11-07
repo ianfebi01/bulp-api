@@ -77,55 +77,83 @@ jobs:
           docker compose logs migrate | grep -qE "applied: V1|no new migrations" \
             || { echo "migrate did not report applying the schema"; exit 1; }
 
+      - name: Auth endpoints
+        run: |
+          set -euo pipefail
+          B=http://localhost:3000
+          C=/tmp/cookies.txt
+
+          # Register CI user and save HTTP-only auth cookies to cookiejar
+          curl -fsS -c "$C" -X POST "$B/v1/auth/register" \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"ci_runner","password":"ci_password123"}' | grep -q '"success":true'
+
+          # Verify current user endpoint (/me) works with the cookie
+          curl -fsS -b "$C" "$B/v1/auth/me" | grep -q '"username":"ci_runner"'
+
+          # Verify refresh token endpoint (/refresh) rotates auth cookies
+          curl -fsS -b "$C" -c "$C" -X POST "$B/v1/auth/refresh" | grep -q '"success":true'
+
+          # Unauthenticated request to protected endpoint must return 401
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -X POST $B/v1/bulb/on)" = 401 ]
+
       - name: Bulb endpoints
         run: |
           set -euo pipefail
-          curl -fsS http://localhost:3000/bulb | tee /dev/stderr | grep -q '"is_on"'
-          curl -fsS -X POST http://localhost:3000/v1/bulb/on  | grep -q '"is_on":true'
-          curl -fsS -X POST http://localhost:3000/v1/bulb/off | grep -q '"is_on":false'
-          curl -fsS -X PUT http://localhost:3000/v1/bulb \
+          B=http://localhost:3000
+          C=/tmp/cookies.txt
+
+          # Legacy IoT endpoint remains unauthenticated — no cookies needed
+          curl -fsS "$B/bulb" | tee /dev/stderr | grep -q '"is_on"'
+
+          # Protected /v1/bulb endpoints require auth cookies
+          curl -fsS -b "$C" -X POST "$B/v1/bulb/on"  | grep -q '"is_on":true'
+          curl -fsS -b "$C" -X POST "$B/v1/bulb/off" | grep -q '"is_on":false'
+          curl -fsS -b "$C" -X PUT "$B/v1/bulb" \
             -H 'Content-Type: application/json' -d '{"is_on":true}' | grep -q '"success":true'
 
       - name: Schedule endpoints (create, run, update, delete)
         run: |
           set -euo pipefail
           B=http://localhost:3000
+          C=/tmp/cookies.txt
 
           # A schedule that fires every 2 seconds proves the cron runner is
           # alive, not merely that rows can be written.
-          curl -fsS -o /dev/null -X PUT "$B/v1/bulb" \
+          curl -fsS -b "$C" -o /dev/null -X PUT "$B/v1/bulb" \
             -H 'Content-Type: application/json' -d '{"is_on":false}'
 
-          ID=$(curl -fsS -X POST "$B/v1/schedules" \
+          ID=$(curl -fsS -b "$C" -X POST "$B/v1/schedules" \
                  -H 'Content-Type: application/json' \
                  -d '{"name":"ci","cron_expr":"*/2 * * * * *","action":"on"}' \
                | python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["id"])')
           echo "created $ID"
 
           sleep 5
-          curl -fsS "$B/v1/bulb" | tee /dev/stderr | grep -q '"is_on":true' \
+          curl -fsS -b "$C" "$B/v1/bulb" | tee /dev/stderr | grep -q '"is_on":true' \
             || { echo "cron job never fired"; docker compose logs bulb-api; exit 1; }
 
-          curl -fsS "$B/v1/schedules" | grep -q "$ID"
-          curl -fsS "$B/v1/schedules/$ID" | grep -q '"success":true'
-          curl -fsS -X PUT "$B/v1/schedules/$ID" \
+          curl -fsS -b "$C" "$B/v1/schedules" | grep -q "$ID"
+          curl -fsS -b "$C" "$B/v1/schedules/$ID" | grep -q '"success":true'
+          curl -fsS -b "$C" -X PUT "$B/v1/schedules/$ID" \
             -H 'Content-Type: application/json' -d '{"enabled":false}' | grep -q '"enabled":false'
-          curl -fsS -X DELETE "$B/v1/schedules/$ID" | grep -q '"success":true'
+          curl -fsS -b "$C" -X DELETE "$B/v1/schedules/$ID" | grep -q '"success":true'
 
       - name: Rejects bad input
         run: |
           set -euo pipefail
           B=http://localhost:3000
+          C=/tmp/cookies.txt
           code() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 
-          [ "$(code -X POST $B/v1/schedules -H 'Content-Type: application/json' \
+          [ "$(code -b "$C" -X POST $B/v1/schedules -H 'Content-Type: application/json' \
                 -d '{"name":"x","cron_expr":"0 0 5 * * *","action":"nope"}')" = 400 ]
           # A 5-field crontab expression must be rejected, not silently accepted.
-          [ "$(code -X POST $B/v1/schedules -H 'Content-Type: application/json' \
+          [ "$(code -b "$C" -X POST $B/v1/schedules -H 'Content-Type: application/json' \
                 -d '{"name":"x","cron_expr":"0 5 * * *","action":"on"}')" = 400 ]
-          [ "$(code $B/v1/schedules/not-a-uuid)" = 400 ]
-          [ "$(code $B/v1/schedules/00000000-0000-0000-0000-000000000000)" = 404 ]
-          [ "$(code $B/v1/nope)" = 404 ]
+          [ "$(code -b "$C" $B/v1/schedules/not-a-uuid)" = 400 ]
+          [ "$(code -b "$C" $B/v1/schedules/00000000-0000-0000-0000-000000000000)" = 404 ]
+          [ "$(code -b "$C" $B/v1/nope)" = 404 ]
           echo "all rejections correct"
 
       - name: Server logs on failure
