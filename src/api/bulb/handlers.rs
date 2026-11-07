@@ -22,6 +22,7 @@ use crate::error::AppError;
     get,
     path = "/bulb",
     tag = "bulb",
+    security(()),
     responses(
         (status = 200, description = "Current bulb state (legacy v1 shape)", body = BulbStateV1),
         (status = 404, description = "Bulb state row not found"),
