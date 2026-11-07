@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use bulb_api::{api, api::schedule::runner::ScheduleRunner, db, openapi::ApiDoc, state::AppState};
 
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
@@ -42,11 +42,12 @@ async fn main() {
         runner: Arc::clone(&runner),
     };
 
-    // CORS — allow all origins for ESP32 access
+    // CORS — allow credentials (cookies) with mirrored origin, methods, and headers for web clients and ESP32
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin(AllowOrigin::mirror_request())
+        .allow_methods(AllowMethods::mirror_request())
+        .allow_headers(AllowHeaders::mirror_request())
+        .allow_credentials(true);
 
     // One router description, split into the thing that serves traffic and the
     // thing that documents it.
@@ -68,3 +69,20 @@ async fn main() {
     tracing::info!("swagger ui on http://0.0.0.0:3000/docs");
     axum::serve(listener, app).await.expect("server error");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cors_layer_does_not_panic_with_credentials() {
+        let cors = CorsLayer::new()
+            .allow_origin(AllowOrigin::mirror_request())
+            .allow_methods(AllowMethods::mirror_request())
+            .allow_headers(AllowHeaders::mirror_request())
+            .allow_credentials(true);
+
+        let _router = axum::Router::<()>::new().layer(cors);
+    }
+}
+
