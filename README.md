@@ -55,6 +55,16 @@ INFO bulb_api::api::schedule::runner: schedule fired id=… name=Turn on every m
 
 ## API Endpoints
 
+### Auth
+
+| Method | Path                | Description                                       | Request Body                    |
+|--------|---------------------|---------------------------------------------------|---------------------------------|
+| `POST` | `/v1/auth/register` | Register a new user and set HTTP-only cookies     | `{"username", "password"}`      |
+| `POST` | `/v1/auth/login`    | Log in and set HTTP-only auth cookies             | `{"username", "password"}`      |
+| `POST` | `/v1/auth/refresh`  | Refresh token pair using refresh_token cookie     | —                               |
+| `POST` | `/v1/auth/logout`   | Clear auth cookies                                | —                               |
+| `GET`  | `/v1/auth/me`       | Get currently authenticated user profile          | —                               |
+
 ### Bulb
 
 | Method | Path           | Description                | Request Body            |

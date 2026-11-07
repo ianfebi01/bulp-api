@@ -24,3 +24,9 @@ refinery = { version = "0.9", features = ["tokio-postgres"] }
 utoipa = { version = "5", features = ["axum_extras", "chrono"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }
 utoipa-axum = "0.2"
+argon2 = "0.6.0"
+jsonwebtoken = { version = "11.1.0", features = ["rust_crypto"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+

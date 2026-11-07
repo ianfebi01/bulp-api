@@ -44,7 +44,7 @@ fn parse_id(raw: &str) -> Result<Uuid, AppError> {
     tag = "schedules",
     request_body = CreateScheduleRequest,
     responses(
-        (status = 200, description = "Schedule created", body = ApiResponse<Schedule>),
+        (status = 201, description = "Schedule created", body = ApiResponse<Schedule>),
         (status = 400, description = "Invalid action or cron expression"),
     )
 )]
