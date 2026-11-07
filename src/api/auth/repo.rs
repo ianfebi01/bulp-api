@@ -66,3 +66,21 @@ pub async fn login(
         updated_at: row.get("updated_at"),
     })
 }
+
+pub async fn find_user_by_id(pool: &Pool, id: uuid::Uuid) -> Result<Login, AppError> {
+    let sql = format!("SELECT {COLS} FROM users WHERE id = $1");
+
+    let row = pool
+        .get()
+        .await?
+        .query_opt(&sql, &[&id])
+        .await?
+        .ok_or_else(|| AppError::Unauthorized("user not found".into()))?;
+
+    Ok(Login {
+        id: row.get("id"),
+        username: row.get("username"),
+        created_at: row.get("created_at"),
+        updated_at: row.get("updated_at"),
+    })
+}

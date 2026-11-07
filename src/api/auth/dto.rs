@@ -38,3 +38,9 @@ pub struct LoginRequest {
     pub username: String,
     pub password: String,
 }
+
+/// Response for logout endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct LogoutResponse {
+    pub message: String,
+}

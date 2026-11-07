@@ -16,6 +16,8 @@ pub enum AppError {
     NotFound(String),
     /// Client sent invalid input → 400.
     BadRequest(String),
+    /// Client is unauthenticated or token is invalid/expired → 401.
+    Unauthorized(String),
     /// Something failed on our side → 500. The detail is logged, never returned.
     Internal(String),
 }
@@ -35,6 +37,16 @@ impl From<tokio_postgres::Error> for AppError {
 impl From<argon2::password_hash::Error> for AppError {
     fn from(e: argon2::password_hash::Error) -> Self {
         AppError::Internal(format!("password hashing error: {e}"))
+    }
+}
+
+impl From<jsonwebtoken::errors::Error> for AppError {
+    fn from(e: jsonwebtoken::errors::Error) -> Self {
+        use jsonwebtoken::errors::ErrorKind;
+        match e.kind() {
+            ErrorKind::ExpiredSignature => AppError::Unauthorized("token has expired".into()),
+            _ => AppError::Unauthorized("invalid or malformed token".into()),
+        }
     }
 }
 
@@ -63,6 +75,7 @@ impl IntoResponse for AppError {
         let (status, code, message) = match self {
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m),
             AppError::BadRequest(m) => (StatusCode::BAD_REQUEST, "bad_request", m),
+            AppError::Unauthorized(m) => (StatusCode::UNAUTHORIZED, "unauthorized", m),
             AppError::Internal(detail) => {
                 // Log the real cause; return a generic message to the client.
                 tracing::error!("internal error: {detail}");
