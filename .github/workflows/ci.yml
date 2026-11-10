@@ -58,6 +58,8 @@ jobs:
       - name: Start the full stack
         run: |
           cp .env.example .env
+          # The auth test registers `ci_runner`, so it must be on the allow-list.
+          sed -i 's/^ALLOWED_USERS=.*/ALLOWED_USERS=ci_runner/' .env
           docker compose up -d --build --wait
           docker compose ps
 

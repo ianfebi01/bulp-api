@@ -73,13 +73,14 @@ jobs:
           SCHEDULE_TZ: ${{ vars.SCHEDULE_TZ || 'Asia/Jakarta' }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           COOKIE_SECURE: "true"
+          ALLOWED_USERS: ${{ secrets.ALLOWED_USERS }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           # Forwards the env block above into the remote shell so the .env file
           # below can be written without interpolating secrets into this YAML.
-          envs: PG_USER,PG_PASSWORD,PG_DBNAME,SCHEDULE_TZ,JWT_SECRET,COOKIE_SECURE
+          envs: PG_USER,PG_PASSWORD,PG_DBNAME,SCHEDULE_TZ,JWT_SECRET,COOKIE_SECURE,ALLOWED_USERS
           script: |
             set -euo pipefail
 
@@ -104,6 +105,7 @@ jobs:
             RUST_LOG=info
             JWT_SECRET=${JWT_SECRET}
             COOKIE_SECURE=${COOKIE_SECURE}
+            ALLOWED_USERS=${ALLOWED_USERS}
             ENVFILE
 
             # The reverse-proxy network is external and must already exist.

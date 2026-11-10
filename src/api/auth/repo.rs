@@ -1,17 +1,31 @@
-use argon2::{
-    Argon2, PasswordHash, PasswordVerifier, password_hash::PasswordHasher,
-};
+use argon2::{password_hash::PasswordHasher, Argon2, PasswordHash, PasswordVerifier};
 use deadpool_postgres::Pool;
 
-use crate::{api::auth::dto::{Login, Register}, error::AppError};
+use crate::{
+    api::auth::dto::{Login, Register},
+    error::AppError,
+};
 
-const COLS: &str = "id, username, password_hash, created_at::TEXT as created_at, updated_at::TEXT as updated_at";
+fn is_allowed_user(username: &str) -> bool {
+    let allowed_users = std::env::var("ALLOWED_USERS").unwrap_or_default();
+    allowed_users
+        .split(',')
+        .map(str::trim)
+        .any(|u| !u.is_empty() && u == username)
+}
+
+const COLS: &str =
+    "id, username, password_hash, created_at::TEXT as created_at, updated_at::TEXT as updated_at";
 
 pub async fn register_user(
     pool: &Pool,
     username: String,
     password: String,
 ) -> Result<Register, AppError> {
+
+    if !is_allowed_user(&username) {
+        return Err(AppError::BadRequest("Username not allowed".into()));
+    }
 
     let argon2 = Argon2::default();
 
@@ -37,11 +51,12 @@ pub async fn register_user(
     })
 }
 
-pub async fn login(
-    pool: &Pool,
-    username: String,
-    password: String,
-) -> Result<Login, AppError> {
+pub async fn login(pool: &Pool, username: String, password: String) -> Result<Login, AppError> {
+
+    if !is_allowed_user(&username) {
+        return Err(AppError::BadRequest("Username not allowed".into()));
+    }
+
     let sql = format!("SELECT {COLS} FROM users WHERE username = $1");
 
     let row = pool
