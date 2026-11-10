@@ -8,10 +8,10 @@ use crate::{
 
 fn is_allowed_user(username: &str) -> bool {
     let allowed_users = std::env::var("ALLOWED_USERS").unwrap_or_default();
-    return allowed_users
+    allowed_users
         .split(',')
         .map(str::trim)
-        .any(|u| !u.is_empty() && u == username);
+        .any(|u| !u.is_empty() && u == username)
 }
 
 const COLS: &str =
