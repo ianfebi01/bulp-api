@@ -54,6 +54,9 @@ services:
       PG_DBNAME: ${PG_DBNAME}
       SCHEDULE_TZ: ${SCHEDULE_TZ:-Asia/Jakarta}
       RUST_LOG: ${RUST_LOG:-info}
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      ALLOWED_USERS: ${ALLOWED_USERS}
     depends_on:
       migrate:
         condition: service_completed_successfully

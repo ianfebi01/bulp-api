@@ -80,7 +80,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           # Forwards the env block above into the remote shell so the .env file
           # below can be written without interpolating secrets into this YAML.
-          envs: PG_USER,PG_PASSWORD,PG_DBNAME,SCHEDULE_TZ,JWT_SECRET,COOKIE_SECURE, ALLOWED_USERS
+          envs: PG_USER,PG_PASSWORD,PG_DBNAME,SCHEDULE_TZ,JWT_SECRET,COOKIE_SECURE,ALLOWED_USERS
           script: |
             set -euo pipefail
 
